@@ -1,0 +1,98 @@
+package com.example.student_portal.service;
+
+import com.example.student_portal.dto.*;
+import com.example.student_portal.entity.Student;
+import com.example.student_portal.exception.ApiException;
+import com.example.student_portal.repository.StudentRepository;
+import com.example.student_portal.util.JwtUtil;
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.scope.ScopedProxyUtils;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import javax.swing.plaf.IconUIResource;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Service
+@AllArgsConstructor()
+public class AuthService {
+
+    private final StudentRepository studentRepo; // Marked as final
+    private final PasswordEncoder passwordEncoder; // Marked as final
+    private final JwtUtil jwtUtil; // Marked as final
+
+    private final EmailService emailService;
+
+    public Student registerUser(StudentRegisterDto req) {
+        if (studentRepo.existsByEmail(req.getEmail())) {
+            throw ApiException.emailAlreadyExists(req.getEmail());
+        }
+        String enrollmentNo = "ENR" + UUID.randomUUID().toString().substring(0, 8);
+
+        Student student = Student.builder()
+                .fullName(req.getFullName())
+                .email(req.getEmail())
+                .enrollmentNo(enrollmentNo)
+                .password(passwordEncoder.encode(req.getPassword()))
+                .role("STUDENT")
+                .isVerified(true).build();
+
+        return studentRepo.save(student);
+
+    }
+
+    public AuthResponse login(LoginRequest req) {
+        Student student = studentRepo.findByEmailOrEnrollmentNo(req.getEmailOrEnrollment(), req.getEmailOrEnrollment())
+                .orElseThrow(ApiException::studentNotFound);
+
+
+        if (!passwordEncoder.matches(req.getPassword(), student.getPassword())) {
+            throw ApiException.invalidPassword();
+        }
+
+        String token = jwtUtil.generateToken(student.getId(), student.getRole());
+        String refreshToken = UUID.randomUUID().toString();
+
+        return new AuthResponse(token, refreshToken, student.getRole());
+    }
+
+    public String forgotPassword(ForgotPasswordDto req) {
+
+        Student student = studentRepo.findByEmail(req.getEmail())
+                .orElseThrow(ApiException::studentNotFound);
+
+        String token = UUID.randomUUID().toString();
+
+        student.setResetTokenExpiryTime(LocalDateTime.now().plusMinutes(30));
+        student.setResetToken(token);
+        studentRepo.save(student);
+
+        String resetUrl = "localhost:8082/auth/reset-password?token=" + token;
+        emailService.sendResetEmail(req.getEmail(), resetUrl);
+        return resetUrl;
+    }
+
+    public Student resetPassword(ResetPasswordRequest request) {
+        Student student = studentRepo.findByResetToken(request.getToken())
+                .orElseThrow(ApiException::invalidToken);
+
+
+        if (student.getResetTokenExpiryTime().isBefore(LocalDateTime.now())) {
+            throw ApiException.invalidToken();
+        }
+
+        student.setResetTokenExpiryTime(null);
+        student.setResetToken(null);
+        student.setPassword(passwordEncoder.encode(request.getNewPassword()));
+
+        studentRepo.save(student);
+
+        return student;
+    }
+
+
+}
+
