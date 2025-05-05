@@ -63,6 +63,7 @@ public class JwtUtil {
             Jwts.parser().setSigningKey(getSecretKey()).parseClaimsJws(token);
             return true;
         } catch (Exception e) {
+            System.out.println("e " + e);
             return false;
         }
     }

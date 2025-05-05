@@ -23,9 +23,15 @@ public class AuthController {
     }
 
 
-    @PostMapping("/login")
+    @PostMapping("/student/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody LoginRequest req) {
         AuthResponse res = authService.login(req);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Login successful", res));
+    }
+
+    @PostMapping("/admin/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> adminLogin(@RequestBody AdminLoginRequest req) {
+        AuthResponse res = authService.adminLogin(req);
         return ResponseEntity.ok(new ApiResponse<>(true, "Login successful", res));
     }
 
@@ -35,10 +41,14 @@ public class AuthController {
         return ResponseEntity.ok(new ApiResponse<>(true , "Forgot password link sent successfully" , null));
     }
 
-    @PostMapping("/reset-password")
     public  ResponseEntity<ApiResponse<Student>> resetPassword(@RequestBody ResetPasswordRequest req){
         Student res = authService.resetPassword(req);
         return ResponseEntity.ok(new ApiResponse<>(true , "Password changed successfully" , res));
     }
 
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestParam String refreshToken) {
+        AuthResponse response = authService.refreshToken(refreshToken);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Token refreshed", response));
+    }
 }

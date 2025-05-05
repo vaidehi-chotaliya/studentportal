@@ -40,10 +40,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-
         String studentId = jwtUtil.extractStudentId(token);
         String role = jwtUtil.extractRole(token);
-
+        System.out.println("role " + role);
         UserDetails userDetails = User.builder()
                 .username(studentId)
                 .password("")

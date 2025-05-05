@@ -27,14 +27,17 @@ public class Student {
 
     private String password; // BCrypt hashed
 
-//    @Builder.Default
-    private String role ;
+    //    @Builder.Default
+    private String role;
 
     private boolean isVerified = false;
 
-    private String resetToken ;
+    private String resetToken;// for reset password
 
-    private LocalDateTime resetTokenExpiryTime;
+    private LocalDateTime resetTokenExpiryTime; // for reset password
+
+    private String refreshToken;
+    private LocalDateTime refreshTokenExpiryTime;
 
     private LocalDateTime createdAt;
 }

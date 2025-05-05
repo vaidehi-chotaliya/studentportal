@@ -1,8 +1,10 @@
 package com.example.student_portal.service;
 
 import com.example.student_portal.dto.*;
+import com.example.student_portal.entity.Admin;
 import com.example.student_portal.entity.Student;
 import com.example.student_portal.exception.ApiException;
+import com.example.student_portal.repository.AdminRepository;
 import com.example.student_portal.repository.StudentRepository;
 import com.example.student_portal.util.JwtUtil;
 import lombok.AllArgsConstructor;
@@ -21,6 +23,8 @@ import java.util.UUID;
 public class AuthService {
 
     private final StudentRepository studentRepo; // Marked as final
+    private final AdminRepository adminRepo; // Marked as final
+
     private final PasswordEncoder passwordEncoder; // Marked as final
     private final JwtUtil jwtUtil; // Marked as final
 
@@ -56,7 +60,28 @@ public class AuthService {
         String token = jwtUtil.generateToken(student.getId(), student.getRole());
         String refreshToken = UUID.randomUUID().toString();
 
+
+        // Save refresh token to DB
+        student.setRefreshToken(refreshToken);
+        student.setRefreshTokenExpiryTime(LocalDateTime.now().plusDays(7)); // Valid for 7 days
+        System.out.println("student " + student);
+        studentRepo.save(student);
+
         return new AuthResponse(token, refreshToken, student.getRole());
+    }
+
+    public AuthResponse adminLogin(AdminLoginRequest req) {
+        Admin admin = adminRepo.findByEmail(req.getEmail())
+                .orElseThrow(ApiException::studentNotFound);
+
+
+        if (!passwordEncoder.matches(req.getPassword(), admin.getPassword())) {
+            throw ApiException.invalidPassword();
+        }
+
+        String token = jwtUtil.generateToken(admin.getId(), "ADMIN");
+        String refreshToken = UUID.randomUUID().toString();
+        return new AuthResponse(token, refreshToken, "ADMIN");
     }
 
     public String forgotPassword(ForgotPasswordDto req) {
@@ -93,6 +118,25 @@ public class AuthService {
         return student;
     }
 
+    public AuthResponse refreshToken(String refreshToken) {
+        Student student = studentRepo.findAll().stream()
+                .filter(s -> refreshToken.equals(s.getRefreshToken()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+
+        if (student.getRefreshTokenExpiryTime() == null || student.getRefreshTokenExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Refresh token expired. Please login again.");
+        }
+
+        String newAccessToken = jwtUtil.generateToken(student.getId(), student.getRole());
+        String newRefreshToken = UUID.randomUUID().toString();
+
+        student.setRefreshToken(newRefreshToken);
+        student.setRefreshTokenExpiryTime(LocalDateTime.now().plusDays(7));
+        studentRepo.save(student);
+
+        return new AuthResponse(newAccessToken, newRefreshToken, student.getRole());
+    }
 
 }
 
